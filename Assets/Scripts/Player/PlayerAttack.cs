@@ -7,8 +7,8 @@ public class PlayerAttack : MonoBehaviour
 {
     Animator _anim;
     Rigidbody2D _rb;
-    Transform _visual;
     TrailRenderer _trailRenderer;
+    PlayerStatus _playerStatus;
 
     [Header("공격")]
     [SerializeField] List<BoxCollider2D> _attackColliderList = new List<BoxCollider2D>();
@@ -16,11 +16,14 @@ public class PlayerAttack : MonoBehaviour
     [SerializeField] float _attackPower = 1000f;
     Coroutine _attackCoroutine;
 
+    [Header("이펙트")]
+    [SerializeField] GameObject _bloodEffect;
+
     void Start()
     {
         _anim = GetComponent<Animator>();
         _rb = GetComponent<Rigidbody2D>();
-        _visual = transform.Find("Visual");
+        _playerStatus = GetComponent<PlayerStatus>();
         _trailRenderer = GetComponentInChildren<TrailRenderer>();
         _attackColliderList = GetComponentsInChildren<BoxCollider2D>().ToList();
     }
@@ -37,16 +40,16 @@ public class PlayerAttack : MonoBehaviour
     IEnumerator AttackCoroutine()
     {
         Vector2 dir = (GetMouseWorldPosition() - transform.position).normalized;
-        Flip(dir.x);
+        _playerStatus.Flip(dir.x);
         _rb.AddForce(dir * _attackPower);
-        _trailRenderer.enabled = true;
         SetEnableAttackCollider(dir.x);
+        _trailRenderer.enabled = true;
         yield return new WaitForSeconds(_attackCoolTime);
         _attackCoroutine = null;
-        SetDisableAttackCollider();
-        _anim.SetBool("IsAttack", false);
         _trailRenderer.Clear();
         _trailRenderer.enabled = false;
+        SetDisableAttackCollider();
+        _anim.SetBool("IsAttack", false);
     }
 
     // 마우스 위치(월드 좌표) 반환
@@ -60,18 +63,6 @@ public class PlayerAttack : MonoBehaviour
 
         // 마우스 위치를 월드 좌표로 변환
         return Camera.main.ScreenToWorldPoint(mouseScreenPos);
-    }
-
-    void Flip(float x)
-    {
-        if (x >= 0)
-        {
-            _visual.transform.rotation = Quaternion.Euler(0, 0, 0);
-        }
-        else if (x < 0)
-        {
-            _visual.transform.rotation = Quaternion.Euler(0, 180, 0);
-        }
     }
 
     // 공격 콜라이더 활성화
@@ -89,5 +80,14 @@ public class PlayerAttack : MonoBehaviour
     {
         foreach (BoxCollider2D collider in _attackColliderList)
             collider.enabled = false;
+    }
+
+    void OnTriggerEnter2D(Collider2D collision)
+    {
+        if(collision.TryGetComponent<IStatus>(out IStatus status))
+        {
+            status.TakeDamage(_playerStatus.Damage);
+            Destroy(Instantiate(_bloodEffect, collision.transform.position, Quaternion.identity), 0.2f);
+        }
     }
 }
